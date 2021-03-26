@@ -1,0 +1,74 @@
+#Google Colab Method to import/upload files 
+from google.colab import files
+files.upload()
+
+#The Main Funtion (Note : Change the variables names as per your df)
+def matcher(df1, df2):
+  #Importing the required packages 
+  import pandas as pd 
+  from pandas import read_excel
+
+  #Asks for the file type and the threshold of Accuracy for matching
+  #df_type = int(input('What are the file types (1: Excel, 2: CSV) ? '))
+  ACCU_in = float(input('At what percent accuracy would you like to match both the file ? : '))
+  ACCU = float(ACCU_in/100)
+
+  #df_type will define the file type when calling the funtion, so that pandas can act arccordingly
+  #grab the data via the file-path and convert them to Pandas Dataframe
+  #if type == 1:
+  cl = pd.read_excel(f'{df1}')
+  re = pd.read_excel(f'{df2}')
+  #else:
+    #cl = pd.read_csv(f'{df1}')
+    #re = pd.read_csv(f'{df2}')
+
+  #Merging First and Last Name for a Full Name in both the datasets
+  #matching by a Full Name is more reliable than using First or Last name indipendently, and this reuslt in fewer duplicats. 
+  cl['FULL_NAME'] = cl['First Name'] + ' ' + cl['Last Name']
+  re['FULL_NAME'] = re['Fst_Nm'] + ' ' + re['Surname']
+
+  #Both the files are merged using an inner join
+  df = pd.merge(left=cl,
+                right=re,
+                how="inner",
+                on = 'FULL_NAME'
+                )
+
+  #New Column for recording match percentage
+  df['match'] = ''
+
+  #For loop for assessing the percentage of match (wehere the magic happes)
+  from difflib import SequenceMatcher
+  count = 0
+  for i in df.iterrows():
+    #we use lambda to loop the condition over each row
+    #1. Match accuracy of Address line 1 between both the files
+    add = SequenceMatcher(lambda x: x == " ", str(df['Address 1'].values[count]), str(df['Preferred_Address_Line_1'].values[count])).ratio()*100
+    #2. Match accuracy of Post Codes between both the files
+    post_code = SequenceMatcher(lambda x: x == " ", str(df['Post Code'].values[count]), str(df['Preferred_Post_Code'].values[count])).ratio()*100
+    #3. Match accuracy of a town/city between both the files
+    town = SequenceMatcher(lambda x: x == " ", str(df['Town'].values[count]), str(df['Preferred_NZ_City'].values[count])).ratio()*100
+    #___________YOU CAN ADD MORE CRITARIAS________________________
+    # A sum of all the match divided by the number of criteria x 100 to 
+    # this gives an overview in percentage of the match which is stored in the df['match'] column for each row
+    per = (add + post_code + town)/300
+    df["match"].values[count] = per
+    #to keep it looping
+    count += 1
+
+  #filter based on math accuracy threshold
+  df2 = df[(df['match'] >= ACCU)]
+
+  # name of the file that will be exported
+  name_it = str(input('What would you like to name the export file ? :'))
+
+  # EXPORTING THE FILE to google Cloabl (IF USING COLAB)
+  writer = pd.ExcelWriter(f"{name_it}.xlsx")
+  df2.to_excel(writer)
+  writer.save()
+  #print('Please Check the Colab file to export')
+  return df
+
+#we call the function
+outfile = matcher(input('Please provide with the file path for the primary dataframe: '), 
+        input('Please provide with the file path for the secondary daatframe: '))
